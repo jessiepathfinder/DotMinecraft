@@ -1,0 +1,43 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.7.33920.267
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DotMinecraft", "DotMinecraft\DotMinecraft.csproj", "{0F0632C4-652F-4E64-B88A-3C1AAA79700F}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DotMinecraft.Tests", "DotMinecraft.Tests\DotMinecraft.Tests.csproj", "{21FBB2C5-DAA9-4AA8-8EF3-200B1927FD29}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DotMinecraft.Server", "DotMinecraft.Server\DotMinecraft.Server.csproj", "{1DACBACE-C6FD-42CF-9A6A-1D37253AACD0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MCSniffer", "MCSniffer\MCSniffer.csproj", "{F573F7BE-EE39-46DB-A0E3-FD6F0A60CF38}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{0F0632C4-652F-4E64-B88A-3C1AAA79700F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0F0632C4-652F-4E64-B88A-3C1AAA79700F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0F0632C4-652F-4E64-B88A-3C1AAA79700F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0F0632C4-652F-4E64-B88A-3C1AAA79700F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{21FBB2C5-DAA9-4AA8-8EF3-200B1927FD29}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{21FBB2C5-DAA9-4AA8-8EF3-200B1927FD29}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{21FBB2C5-DAA9-4AA8-8EF3-200B1927FD29}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{21FBB2C5-DAA9-4AA8-8EF3-200B1927FD29}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1DACBACE-C6FD-42CF-9A6A-1D37253AACD0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1DACBACE-C6FD-42CF-9A6A-1D37253AACD0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1DACBACE-C6FD-42CF-9A6A-1D37253AACD0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1DACBACE-C6FD-42CF-9A6A-1D37253AACD0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F573F7BE-EE39-46DB-A0E3-FD6F0A60CF38}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F573F7BE-EE39-46DB-A0E3-FD6F0A60CF38}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F573F7BE-EE39-46DB-A0E3-FD6F0A60CF38}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F573F7BE-EE39-46DB-A0E3-FD6F0A60CF38}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {70EF2845-85BB-469E-B0FF-25DB0034A09C}
+	EndGlobalSection
+EndGlobal
