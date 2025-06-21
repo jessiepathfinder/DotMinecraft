@@ -5,6 +5,7 @@ using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO.Compression;
+using System.IO.IsolatedStorage;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
@@ -540,14 +541,15 @@ namespace DotMinecraft
 				minecraftProtocolEncoder.WriteByte(0);
 				minecraftProtocolEncoder.WriteByte(0);
 
-				//zero biomes for now
-				minecraftProtocolEncoder.WriteByte(0);
+				//plains everywhere for now
+				minecraftProtocolEncoder.WriteVarint(1024);
+				for (int i = 0; i < 1024; ++i) minecraftProtocolEncoder.WriteByte(1);
 
 				//minecraftProtocolEncoder.WriteVarint(0);
 				minecraftProtocolEncoder.WriteVarint(131152);
 
-				Span<ushort> ushorts = stackalloc ushort[4096];
-				Span<byte> spanView = MemoryMarshal.AsBytes(ushorts);
+				Span<ulong> ulongs = stackalloc ulong[1024];
+				Span<byte> spanView = MemoryMarshal.AsBytes(ulongs);
 
 				try
 				{
@@ -558,14 +560,17 @@ namespace DotMinecraft
 					for(int y1 = 0; y1 < 256; y1 += 16){
 						int bc = 0;
 						int i3 = 0;
+						ulongs.Clear();
 						for (int y2 = 0; y2 < 16; ++y2){
 							int y = y1 + y2;
 							
 							for (int z = 0; z < 16; ++z){
 								for(int x = 0; x < 16; ++x){
 									FlatMinecraftBlock flatMinecraftBlock = chunkData.ReadBlock(new PreciseCoordinate(x, y, z), 255);
-									ushorts[i3] = flatMinecraftBlock.id;
-									spanView.Slice(2 * i3++, 2).Reverse();
+									int mod = i3 - ((i3 / 4) * 4);
+									ulongs[i3 / 4] |= ((ulong)flatMinecraftBlock.id)  << (mod * 15);
+									++i3;
+									//spanView.Slice(2 * i3++, 2).Reverse();
 									if (flatMinecraftBlock.id != 0) ++bc;
 									IReadOnlyDictionary<string, object>? extraData = flatMinecraftBlock.extraData;
 									if(extraData is { }){
@@ -583,14 +588,24 @@ namespace DotMinecraft
 							}							
 						}
 						if (y1 == 240) Monitor.Exit(globalObjectLock);
+
+						for (int i = 0; i < 8192; i += 8)
+						{
+							spanView.Slice(i, 8).Reverse();
+						}
 						minecraftProtocolEncoder.WriteUnmanagedBigEndian((short)bc);
-						minecraftProtocolEncoder.WriteByte(16);
+						minecraftProtocolEncoder.WriteByte(15);
 						minecraftProtocolEncoder.WriteVarint(1024);
 						minecraftProtocolEncoder.WriteDirect(spanView);
 					}
 				} finally{
 					if(Monitor.IsEntered(globalObjectLock)) Monitor.Exit(globalObjectLock);
 				}
+				
+				/*
+				
+				*/
+				
 				minecraftProtocolEncoder.WriteVarint(0);
 				byte[] buf = ms.GetBuffer();
 				int mss = ((int)ms.Position) - 6;
@@ -631,7 +646,6 @@ namespace DotMinecraft
 				tsc.SetException(e);
 
 			}
-			Console.WriteLine("Didit!");
 		}
 
 		public FlatMinecraftBlock ReadBlock(PreciseCoordinate preciseCoordinate, byte minimumGenerationLevel)

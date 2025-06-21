@@ -200,7 +200,6 @@ namespace DotMinecraft
 		private readonly Dictionary<int, Action<MinecraftClientContext, MinecraftProtocolDecoder>> registeredPacketHandlers = new Dictionary<int, Action<MinecraftClientContext, MinecraftProtocolDecoder>>();
 		public static async void SendChunkToClientAsync(WorldManager worldManager, MinecraftClientMailboxThread minecraftClientMailboxThread, Coordinate2d coordinate2D){
 			ReadOnlyMemory<byte> rom = await worldManager.LoadAndSerializeChunkPacketAsync(coordinate2D);
-			Console.WriteLine(coordinate2D.x + "|" + coordinate2D.z);
 			minecraftClientMailboxThread.SendDataAsync(rom);
 		}
 		private void Handle2(MinecraftClientContext mcc, MinecraftProtocolDecoder minecraftProtocolDecoder){
@@ -336,7 +335,6 @@ namespace DotMinecraft
 							mcmb.SetFlushingPolicy(true);
 							mcmb.Flush();
 						}
-						Thread.Sleep(5000);
 
 						for (int x = -4; x < 4; ++x)
 						{
@@ -347,8 +345,7 @@ namespace DotMinecraft
 						}
 						
 						
-						Thread.Sleep(5000);
-						mcmb.SerializeCompressAndSendDataAsync(new MinecraftEventPacket(2, 0.0f));
+						//mcmb.SerializeCompressAndSendDataAsync(new MinecraftEventPacket(2, 0.0f));
 
 
 

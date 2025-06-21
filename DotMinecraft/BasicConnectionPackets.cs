@@ -213,6 +213,56 @@ namespace DotMinecraft
 			
 		}
 	}
+	[StructLayout(LayoutKind.Sequential)]
+	[MinecraftStandardPacketBinding(0x15)]
+	internal sealed class MinecraftPlayerMovement : IMinecraftPacket
+	{
+
+		private bool onGround;
+
+		public void Handle(MinecraftClientContext minecraftContext)
+		{
+
+		}
+	}
+	[StructLayout(LayoutKind.Sequential)]
+	[MinecraftStandardPacketBinding(0x14)]
+	internal sealed class MinecraftPlayerRotation : IMinecraftPacket
+	{
+		private float yaw;
+		private float pitch;
+		private bool onGround;
+
+		public void Handle(MinecraftClientContext minecraftContext)
+		{
+
+		}
+	}
+	[StructLayout(LayoutKind.Sequential)]
+	[MinecraftStandardPacketBinding(0x1A)]
+	internal sealed class MinecraftPlayerAbilities : IMinecraftPacket
+	{
+		private bool flags;
+
+		public void Handle(MinecraftClientContext minecraftContext)
+		{
+
+		}
+	}
+	[StructLayout(LayoutKind.Sequential)]
+	[MinecraftStandardPacketBinding(0x12)]
+	internal sealed class MinecraftPlayerPosition : IMinecraftPacket
+	{
+		private double a;
+		private double b;
+		private double c;
+		private bool onGround;
+
+		public void Handle(MinecraftClientContext minecraftContext)
+		{
+
+		}
+	}
 	[StructLayout(LayoutKind.Sequential)][MinecraftPacketPrefix(0x1D)]
 	internal sealed class MinecraftEventPacket : IMinecraftSerializable
 	{
