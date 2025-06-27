@@ -33,7 +33,48 @@ namespace DotMinecraft
 		private const int CONTINUE_BIT = 0x80;
 		private const long SEGMENT_BITS_LONG = 0x7F;
 		private const long CONTINUE_BIT_LONG = 0x80;
+		public static (int val, int index) ReadVarInt(ReadOnlySpan<byte> span)
+		{
+			int value = 0;
+			int position = 0;
+			int i = 0;
+			byte currentByte;
 
+			while (true)
+			{
+				currentByte = span[i++];
+				value |= (currentByte & SEGMENT_BITS) << position;
+
+				if ((currentByte & CONTINUE_BIT) == 0) break;
+
+				position += 7;
+
+				if (position >= 32) throw new Exception("VarInt is too big");
+			}
+
+			return (value,i);
+		}
+		public static (long val, int index) ReadVarLong(ReadOnlySpan<byte> span)
+		{
+			long value = 0;
+			int position = 0;
+			int i = 0;
+			byte currentByte;
+
+			while (true)
+			{
+				currentByte = span[i++];
+				value |= (currentByte & SEGMENT_BITS_LONG) << position;
+
+				if ((currentByte & CONTINUE_BIT_LONG) == 0) break;
+
+				position += 7;
+
+				if (position >= 64) throw new Exception("VarLong is too big");
+			}
+
+			return (value, i);
+		}
 		public static int WriteVarInt(Span<byte> span, int value)
 		{
 			int i = 0;
@@ -69,6 +110,14 @@ namespace DotMinecraft
 				value >>>= 7;
 			}
 			return i;
+		}
+		public static void WriteUnmanagedBigEndian<T>(Span<byte> span, T value) where T : unmanaged{
+			Span<byte> span2 = MemoryMarshal.AsBytes(new Span<T>(ref value));
+			int len = span2.Length;
+			int s = len - 1;
+			for(int i = 0; i < len; ++i){
+				span[i] = span2[s - i];
+			}
 		}
 	}
 	public static class MinecraftProtocolConstantSizeFastSerializer<T> where T : IMinecraftSerializable

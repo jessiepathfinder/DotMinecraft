@@ -189,7 +189,7 @@ namespace DotMinecraft
 		[VariableSize]
 		private readonly int teleportId;
 
-		public MinecraftPlayerTeleport(double x, double y, double z, float yaw, float pitch, int teleportId)
+		public MinecraftPlayerTeleport(double x, double y, double z, float yaw, float pitch,byte flags, int teleportId)
 		{
 			this.x = x;
 			this.y = y;
@@ -209,8 +209,8 @@ namespace DotMinecraft
 		private bool onGround;
 
 		public void Handle(MinecraftClientContext minecraftContext)
-		{
-			
+		{			
+			minecraftContext.position = new Position(x, y, z);
 		}
 	}
 	[StructLayout(LayoutKind.Sequential)]
@@ -219,6 +219,35 @@ namespace DotMinecraft
 	{
 
 		private bool onGround;
+
+		public void Handle(MinecraftClientContext minecraftContext)
+		{
+			
+		}
+	}
+	[StructLayout(LayoutKind.Sequential)]
+	[MinecraftStandardPacketBinding(0x10)]
+	internal sealed class MinecraftServerboundKeepalive : IMinecraftPacket
+	{
+
+		private long l;
+
+		public void Handle(MinecraftClientContext minecraftContext)
+		{
+
+		}
+	}
+	[StructLayout(LayoutKind.Sequential)]
+	[MinecraftStandardPacketBinding(0x1c)]
+	internal sealed class EntityAction : IMinecraftPacket
+	{
+
+		[VariableSize]
+		private int a;
+		[VariableSize]
+		private int b;
+		[VariableSize]
+		private int c;
 
 		public void Handle(MinecraftClientContext minecraftContext)
 		{
@@ -253,14 +282,14 @@ namespace DotMinecraft
 	[MinecraftStandardPacketBinding(0x12)]
 	internal sealed class MinecraftPlayerPosition : IMinecraftPacket
 	{
-		private double a;
-		private double b;
-		private double c;
+		private double x;
+		private double y;
+		private double z;
 		private bool onGround;
 
 		public void Handle(MinecraftClientContext minecraftContext)
 		{
-
+			minecraftContext.position = new Position(x, y, z);
 		}
 	}
 	[StructLayout(LayoutKind.Sequential)][MinecraftPacketPrefix(0x1D)]
@@ -275,5 +304,30 @@ namespace DotMinecraft
 			this.extraData = extraData;
 		}
 	}
+	[StructLayout(LayoutKind.Sequential)] [MinecraftPacketPrefix(0x1C)]
+	internal sealed class ChunkUnloadPacket : IMinecraftSerializable{
+		private readonly int x;
+		private readonly int z;
 
+		public ChunkUnloadPacket(int x, int z)
+		{
+			this.x = x;
+			this.z = z;
+		}
+	}
+	[StructLayout(LayoutKind.Sequential)]
+	[MinecraftPacketPrefix(0x40)]
+	internal sealed class MinecraftUpdateViewPosition : IMinecraftSerializable
+	{
+		[VariableSize]
+		private readonly int x;
+		[VariableSize]
+		private readonly int z;
+
+		public MinecraftUpdateViewPosition(int x, int z)
+		{
+			this.x = x;
+			this.z = z;
+		}
+	}
 }

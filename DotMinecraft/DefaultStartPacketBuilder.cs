@@ -74,7 +74,7 @@ namespace DotMinecraft
 			trybuffer[4] = 0x01;
 			int zp;
 			using (MemoryStream ms = new MemoryStream(trybuffer, 5, 8187, true, false)){
-				using(ZLibStream zls = new ZLibStream(ms, CompressionLevel.Optimal, true)){
+				using(ZLibStream zls = new ZLibStream(ms, CompressionLevel.SmallestSize, true)){
 					zls.Write(dsp);
 					zls.Flush();
 				}

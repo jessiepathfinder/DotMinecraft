@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace DotMinecraft
 {
-	public sealed class MinecraftProtocolEncoder{
+	public readonly struct MinecraftProtocolEncoder{
 		private readonly Stream stream;
 
 		public MinecraftProtocolEncoder(Stream stream)

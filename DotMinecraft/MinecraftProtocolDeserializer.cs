@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -93,16 +94,24 @@ namespace DotMinecraft
 			}
 		}
 		private static readonly MethodInfo gruMethod = typeof(MinecraftProtocolDeserializer).GetMethod("GeneralReadUnmanaged", BindingFlags.Static | BindingFlags.NonPublic, new Type[] { typeof(MinecraftProtocolDecoder), typeof(object) }) ?? throw new Exception("Unable to get GeneralReadUnmanaged method (should not reach here)");
+		private static readonly ConcurrentDictionary<Type, FieldInfo[]> sortedFieldInfos = new();
 		private static void ReadNextPacketImpl(MinecraftProtocolDecoder minecraftProtocolDecoder, Type type, object obj){
 			MethodInfo gruMethod = MinecraftProtocolDeserializer.gruMethod;
 
-			FieldInfo[] fieldInfos = type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+			ConcurrentDictionary<Type, FieldInfo[]> sortedFieldInfos = MinecraftProtocolDeserializer.sortedFieldInfos;
+			if (sortedFieldInfos.TryGetValue(type, out FieldInfo[]? fieldInfos)){
+				if (fieldInfos is null) throw new Exception("Unexpected null field info array (should not reach here)");
+			} else{
+				fieldInfos = type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+				fieldInfos.AsSpan().Sort((FieldInfo x, FieldInfo y) => {
+					int a = Marshal.OffsetOf(type, x.Name).ToInt32();
+					int b = Marshal.OffsetOf(type, y.Name).ToInt32();
+					return a - b;
+				});
+				sortedFieldInfos.TryAdd(type, fieldInfos);
+			}
 
-			fieldInfos.AsSpan().Sort((FieldInfo x, FieldInfo y) => {
-				int a = Marshal.OffsetOf(type, x.Name).ToInt32();
-				int b = Marshal.OffsetOf(type, y.Name).ToInt32();
-				return a - b;
-			});
+			
 			for (int i = 0, stop = fieldInfos.Length; i < stop; ++i){
 				FieldInfo field = fieldInfos[i];
 				if(field.IsStatic){

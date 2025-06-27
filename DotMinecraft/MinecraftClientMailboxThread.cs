@@ -45,7 +45,11 @@ namespace DotMinecraft
 		public void SendDataAsync(ReadOnlyMemory<byte> data){
 			if (data.Length == 0) return;
 			messageQueue.Enqueue(data);
-			semaphoreSlim.Release();
+			try{
+				semaphoreSlim.Release();
+			} catch(ObjectDisposedException){
+				messageQueue.TryDequeue(out _);
+			}
 		}
 		public void SerializeCompressAsyncAndSendDataAsync<T>(T data) where T : IMinecraftSerializable
 		{
@@ -90,7 +94,7 @@ namespace DotMinecraft
 				long newsz;
 				try{
 					using MemoryStream ms = new MemoryStream(newbuf, boff + 10, truelen - 1, true, false);
-					using (ZLibStream zls = new ZLibStream(ms, CompressionLevel.Optimal, true))
+					using (ZLibStream zls = new ZLibStream(ms, CompressionLevel.SmallestSize, true))
 					{
 						zls.Write(innerBuffer.Slice(0,truelen));
 					}
@@ -147,8 +151,7 @@ namespace DotMinecraft
 				}
 			}
 			memory = (memory.Length > 0) ? memory.Slice(bo, la + lc) : buffer.ToArray();
-			messageQueue.Enqueue(memory);
-			semaphoreSlim.Release();
+			SendDataAsync(memory);
 		}
 
 

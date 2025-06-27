@@ -21,7 +21,27 @@ namespace DotMinecraft
 	public enum MinecraftProtocolState : byte{
 		handshake, login, encrypt, play
 	}
+	public sealed class Position{
+		public Position(double x, double y, double z){
+			this.x = x;
+			this.y = y;
+			this.z = z;
+		}
+		public double x;
+		public double y;
+		public double z;
+	}
+	public sealed class BlockUpdateConsequencesQueue{
+		public BlockUpdateConsequencesQueue(ReadOnlyMemory<byte> packet) {
+			this.packet = packet;
+		}
+		public readonly ReadOnlyMemory<byte> packet;
+		public BlockUpdateConsequencesQueue? next;
+	}
 	public sealed class MinecraftClientContext{
+		
+		
+		
 		public readonly MinecraftStreamWriter writer;
 		public RSA? keypair;
 		public MinecraftProtocolState state;
@@ -30,6 +50,14 @@ namespace DotMinecraft
 		public string? username;
 		public readonly UUID uuid;
 		private MinecraftClientMailboxThread mailboxThread;
+		public volatile Position position;
+		public volatile int deactivating;
+
+		public const int renderDistance = 12;
+
+		private readonly Dictionary<Coordinate2d, bool> loadedChunks = new Dictionary<Coordinate2d, bool>();
+		private readonly ConcurrentDictionary<Coordinate2d, BlockUpdateConsequencesQueue[]> completedLoadingRequests = new ConcurrentDictionary<Coordinate2d, BlockUpdateConsequencesQueue[]>();
+
 		public MinecraftClientMailboxThread MailboxThread{
 			get {
 				mailboxThread.RequireValid();
@@ -68,6 +96,71 @@ namespace DotMinecraft
 		{
 			this.writer = writer;
 			RandomNumberGenerator.Fill(MemoryMarshal.AsBytes(new Span<UUID>(ref uuid)));
+		}
+		private void SendChunkToClientAsync(MinecraftWorldManager worldManager, Coordinate2d coordinate2D)
+		{
+			if (loadedChunks.TryAdd(coordinate2D, false))
+			{
+				SendChunkToClientAsync1(worldManager, coordinate2D);
+			}
+		}
+		private async void SendChunkToClientAsync1(MinecraftWorldManager worldManager, Coordinate2d coordinate2D)
+		{
+			(ReadOnlyMemory<byte> rom, BlockUpdateConsequencesQueue blockUpdateConsequencesQueue) = await worldManager.LoadAndSerializeChunkPacketAsync(coordinate2D);
+			mailboxThread.SendDataAsync(rom);
+			if (!completedLoadingRequests.TryAdd(coordinate2D, new BlockUpdateConsequencesQueue[] { blockUpdateConsequencesQueue }))
+			{
+				throw new Exception("Unable to register chunk as loaded (should not reach here)");
+			}
+		}
+		internal void ProcessTick(MinecraftWorldManager minecraftWorldManager){
+			Position position = this.position;
+			Coordinate2d chunkAlignedPosition = new Coordinate2d((int)Math.Floor(position.x), (int)Math.Floor(position.z)).ShiftRoundDown(4);
+			int hrd = renderDistance / 2;
+			int bx = chunkAlignedPosition.x - hrd;
+			int bz = chunkAlignedPosition.z - hrd;
+			MailboxThread.SerializeCompressAndSendDataAsync(new MinecraftUpdateViewPosition(chunkAlignedPosition.x, chunkAlignedPosition.z), false);
+
+			Dictionary<Coordinate2d,bool> residentSet = new(renderDistance * renderDistance);
+			for(int x = 0; x < renderDistance; ++x){
+				for(int z = 0; z < renderDistance; ++z){
+					Coordinate2d c2d = new Coordinate2d(x + bx, z + bz);
+					SendChunkToClientAsync(minecraftWorldManager, c2d);
+					residentSet.Add(c2d,false);
+				}
+			}
+			foreach(Coordinate2d coordinate2D in residentSet.Keys){
+				minecraftWorldManager.MarkChunkInUse(coordinate2D);
+			}
+			Dictionary<Coordinate2d, bool> loaded = loadedChunks;
+			var clrs = completedLoadingRequests;
+			var kvps = clrs.ToArray();
+			MinecraftClientMailboxThread m = mailboxThread;
+
+			for (int i = 0, stop = kvps.Length; i < stop; ++i ){
+				KeyValuePair<Coordinate2d, BlockUpdateConsequencesQueue[]> kvp = kvps[i];
+				Coordinate2d c2d = kvp.Key;
+				if (residentSet.ContainsKey(c2d)){
+					ref BlockUpdateConsequencesQueue b = ref kvp.Value[0];
+					BlockUpdateConsequencesQueue c = b;
+					while (true){
+						ReadOnlyMemory<byte> rom = c.packet;
+						if(rom.Length > 0){
+							m.SendDataAsync(rom);
+						}
+						BlockUpdateConsequencesQueue? bn = c.next;
+						if (bn is null) break;
+						c = bn;
+					}
+					b = c;
+				} else{
+					m.SerializeCompressAndSendDataAsync(new ChunkUnloadPacket(c2d.x, c2d.z));
+					if (!clrs.TryRemove(c2d, out BlockUpdateConsequencesQueue[]? b)) throw new Exception("Unable to unregister chunk (should not reach here)");
+					if (!ReferenceEquals(b, kvp.Value)) throw new Exception("Unexpected different array (should not reach here)");
+					if (!loaded.Remove(c2d, out bool _)) throw new Exception("Unable to mark chunk as unloaded by client (should not reach here)");
+				}
+			}
+
 		}
 
 	}
@@ -133,7 +226,8 @@ namespace DotMinecraft
 	}
 	public sealed class MinecraftListener
 	{
-		private static readonly WorldManager worldManager = new WorldManager(SimpleSuperflatGenerator.instance);
+		private static readonly MinecraftWorldManager worldManager = new MinecraftWorldManager(new SimplePerlinWorldGenerator(), "C:\\Users\\jessi\\source\\repos\\DotMinecraft\\DotMinecraft.Server\\bin\\Debug\\net8.0\\savetester\\");
+
 		private static readonly SemaphoreSlim RSAKeygenSemaphore = new(0);
 		private static readonly ConcurrentBag<RSA> rsaKeyPool = new ConcurrentBag<RSA>();
 		
@@ -141,6 +235,7 @@ namespace DotMinecraft
 			rsaKeyPool.Add(RSA.Create(4096));
 			RSAKeygenSemaphore.Release();
 		}
+
 		private sealed class SpecialTruncateReadStream : Stream
 		{
 			public SpecialTruncateReadStream(Stream stream, int limit){
@@ -198,10 +293,6 @@ namespace DotMinecraft
 
 		private readonly Action<MinecraftClientContext,MinecraftProtocolDecoder>?[] registeredPacketHandlersLower;
 		private readonly Dictionary<int, Action<MinecraftClientContext, MinecraftProtocolDecoder>> registeredPacketHandlers = new Dictionary<int, Action<MinecraftClientContext, MinecraftProtocolDecoder>>();
-		public static async void SendChunkToClientAsync(WorldManager worldManager, MinecraftClientMailboxThread minecraftClientMailboxThread, Coordinate2d coordinate2D){
-			ReadOnlyMemory<byte> rom = await worldManager.LoadAndSerializeChunkPacketAsync(coordinate2D);
-			minecraftClientMailboxThread.SendDataAsync(rom);
-		}
 		private void Handle2(MinecraftClientContext mcc, MinecraftProtocolDecoder minecraftProtocolDecoder){
 			int packetType = minecraftProtocolDecoder.ReadVarInt();
 
@@ -236,6 +327,7 @@ namespace DotMinecraft
 			Stream? inputStream = null;
 			Stream? outputStream = null;
 			NetworkStream? networkStream = null;
+			MinecraftClientContext? mcc = null;
 			try
 			{
 				Console.WriteLine("New client connecting!");
@@ -255,14 +347,14 @@ namespace DotMinecraft
 
 				inputStream = InputBufferedStream.Create1(ns1);
 				MinecraftProtocolDecoder decoder = new MinecraftProtocolDecoder(new BinaryReader(inputStream, NoEncoding.instance,true));
-				//outputStream = OutputBufferedStream.Create1(ns1);
-				outputStream = ns1;
+				outputStream = OutputBufferedStream.Create1(ns1);
+				//outputStream = ns1;
 				//outputStream = networkStream;
 				mcsw = new MinecraftStreamWriter(outputStream);
 
 				object mcsw_lock = mcsw.syncLock;
 
-				MinecraftClientContext mcc = new MinecraftClientContext(mcsw);
+				mcc = new MinecraftClientContext(mcsw);
 				mcc.keypair = rsakey;
 				bool isCompressionEnabled = false;
 
@@ -324,27 +416,22 @@ namespace DotMinecraft
 						
 
 						mcmb.SerializeCompressAndSendDataAsync(new MinecraftConnectionSuccessSimple(mcc.uuid, mcc.username ?? throw new Exception("Minecraft player does not have username")),false);
-						DefaultStartPacketBuilder.WriteCompressedDefaultStartPacket(mcmb, 1, false, GameMode.Creative, 1234567890, 16, false, true, false, true);
+						DefaultStartPacketBuilder.WriteCompressedDefaultStartPacket(mcmb, 1, false, GameMode.Creative, 1234567890, MinecraftClientContext.renderDistance, false, true, false, true);
 
 						HardcodedDeclarationsPacket.Send(mcmb);
-						
-						mcmb.SerializeCompressAndSendDataAsync(new MinecraftPlayerTeleport(0, 64, 0, 0.0f, 0.0f, 1));
+						mcc.position = new Position(0.0,64.0,0.0);
+
+						mcmb.SerializeCompressAndSendDataAsync(new MinecraftPlayerTeleport(0, 64, 0, 0.0f, 0.0f,0, 1));
 
 						lock (mcsw.syncLock)
 						{
 							mcmb.SetFlushingPolicy(true);
 							mcmb.Flush();
 						}
+						worldManager.RegisterClient(mcc);
+						KeepaliveLoop(mcc);
 
-						for (int x = -4; x < 4; ++x)
-						{
-							for (int y = -4; y < 4; ++y)
-							{
-								SendChunkToClientAsync(worldManager, mcmb, new Coordinate2d(x, y));
-							}
-						}
-						
-						
+
 						//mcmb.SerializeCompressAndSendDataAsync(new MinecraftEventPacket(2, 0.0f));
 
 
@@ -381,6 +468,9 @@ namespace DotMinecraft
 							{
 								mcsw.Dispose();
 								mcmb.CancelIfNotNull();
+								if(mcc is { }){
+									mcc.deactivating = 1;
+								}
 							}
 						}
 					}
@@ -396,6 +486,14 @@ namespace DotMinecraft
 			newthread.Start();
 		}
 		private static readonly MethodInfo staticHandler = typeof(MinecraftListener).GetMethod("StaticHandler", BindingFlags.Static | BindingFlags.Public) ?? throw new Exception("Unable to reflectively access static handler (should not reach here)");
+		private static readonly byte[] hardcodedKeepalivePacket = new byte[] {10,0x00,0x1f,0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+		private static async void KeepaliveLoop(MinecraftClientContext b){
+			MinecraftClientMailboxThread a = b.MailboxThread;
+			while (b.deactivating == 0){
+				await Task.Delay(RandomNumberGenerator.GetInt32(1000, 2000));
+				a.SendDataAsync(hardcodedKeepalivePacket);
+			}
+		}
 		public MinecraftListener(TcpListener tcpListener)
 		{
 			this.tcpListener = tcpListener ?? throw new ArgumentNullException(nameof(tcpListener));
